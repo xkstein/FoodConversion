@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+  <meta charset="UTF-8">
+  <title>Volume to Weight Food Converter</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<div style="display:flex;flex-flow: row wrap;gap:1em;justify-content: center;width: 100%;">
+  <div class='text_area_container'>
+    <span id="indicator" class="text_area_span"></span>
+    <textarea id='input_area' class='text_area' placeholder="Recipe..." autocorrect="off"></textarea>
+    <span id="prediction" class="text_area_span"></span>
+  </div>
+
+  <div class='text_area_container'>
+    <textarea id='out_area' class='text_area' placeholder="" autocorrect="off" readonly="yes"></textarea>
+  </div>
+</div>
+<script src="./density_database.js"></script>
+<script src="./script.js"></script>
+</body>
+</html>
