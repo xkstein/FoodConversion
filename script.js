@@ -41,8 +41,9 @@ function get_cursor_position(text_obj) {
 
 
 function generate_prediction(row, search_list) {
-    let words = row.split(' ');
+    let words = row.split(/\s+/);
     let predictions = []
+    let input_area_edit = [];
     if (words[words.length - 1] == "" || isNaN(words[0])) {
         words = [];
     } else if (words.length == 2) {
@@ -56,43 +57,61 @@ function generate_prediction(row, search_list) {
             }
         }
 
+        const regex = new RegExp("^" + word, "i");
         for (const unit of unit_names) {
-            regex = new RegExp("^" + word, "i")
             if (regex.test(unit)) {
                 word_case_matched = word + unit.slice(word.length);
-                //words.push(word_case_matched);
-                //break;
-                predictions.push(word_case_matched);
+                //predictions.push(word_case_matched);
+                const pred = {
+                    "ind": 0,
+                    "text": word_case_matched,
+                };
+                predictions.push(pred);
             }
         }
-        words.push(predictions[0]);
-    } else if (words.length == 3) {
-        const word = words.pop()
-        for (const food_name of search_list) {
-            regex = new RegExp("^" + word, "i");
-            if (regex.test(food_name)) {
-                word_case_matched = word + food_name.slice(word.length);
-                //words.push(word_case_matched);
-                //break;
-                predictions.push(word_case_matched);
-            }
-        }
-        words.push(predictions[0]);
-    } else if (words.length > 3) {
+//        words.push(predictions[0]);
+    } else if (words.length > 2) {
         const word = words.slice(2).join(' ');
         words = words.slice(0,2);
+        const regex_init = new RegExp("^" + word, "i");
+        const regex = new RegExp('\\b' + word, "i");
         for (const food_name of search_list) {
-            regex = new RegExp("^" + word, "i");
-            if (regex.test(food_name)) {
+            if (regex_init.test(food_name)) {
                 word_case_matched = word + food_name.slice(word.length);
-                //words.push(word_case_matched);
-                //break;
-                predictions.push(word_case_matched);
+                //predictions.unshift(word_case_matched);
+                const pred = {
+                    "ind": 0,
+                    "text": word_case_matched,
+                };
+                predictions.unshift(pred);
+            } else if (regex.test(food_name)) {
+                const ind = food_name.search(regex);
+                word_case_matched = food_name.slice(0, ind) + word + food_name.slice(ind + word.length);
+                //predictions.push(word_case_matched);
+                const pred = {
+                    "ind": ind,
+                    "text": word_case_matched,
+                };
+                predictions.push(pred);
             }
         }
-        words.push(predictions[0]);
+        
+//        if (predictions.length) {
+//            ind = predictions[0].search(regex);
+//            console.log(ind);
+//            if (ind == 0) {
+////                words.push(predictions[0]);
+//            } else {
+//                input_area_edit = [word];
+//                for (let i = 0; i < ind; i++) {
+//                    input_area_edit.unshift('');
+//                }
+//                input_area_edit.unshift(...words.slice(0,2));
+////                words.push(predictions[0]);
+//            }
+//        }
     }
-    return [words, predictions];
+    return predictions;
 }
 
 function generate_weight(volume) {
@@ -137,7 +156,6 @@ function generate_weight(volume) {
 }
 
 input_area.addEventListener("keydown", (e) => {
-    console.log(e.key);
     cursor_pos = get_cursor_position(input_area);
     if (e.key == "Tab") {
         try {
@@ -160,16 +178,29 @@ input_area.addEventListener("keydown", (e) => {
     } else if (e.key == "ArrowUp") {
         try {
             if (cursor_pos[1] < pred_text[cursor_pos[0]].join(' ').length && cursor_pos[1] == input_area.value.split('\n')[cursor_pos[0]].length) {
-                console.log(pred_text[cursor_pos[0]]);
                 const tmp = predictions[cursor_pos[0]].pop();
                 predictions[cursor_pos[0]].unshift(tmp);
 
                 pred_text[cursor_pos[0]] = pred_text[cursor_pos[0]].slice(0,2);
-                pred_text[cursor_pos[0]].push(...predictions[cursor_pos[0]][0].split(" "));
-                console.log(predictions[cursor_pos[0]][0]);
-                console.log(pred_text[cursor_pos[0]]);
+                pred_text[cursor_pos[0]].push(...predictions[cursor_pos[0]][0]["text"].split(" "));
+
+                let input_area_rows = input_area.value.split('\n');
+                let edited_row = input_area_rows[cursor_pos[0]].split(/\s+/);
+                let last_text = '';
+                if (edited_row.length == 2) {
+                    last_text = edited_row.pop();
+                } else if (edited_row.length > 2) {
+                    last_text = edited_row.slice(2).join(' ');
+                    edited_row = edited_row.slice(0,2);
+                }
+                for (let i = 0; i < predictions[cursor_pos[0]][0]["ind"]; i++) {
+                    edited_row.push('');
+                }
+                edited_row.push(last_text);
+                input_area_rows[cursor_pos[0]] = edited_row.join(' ');
 
                 pred_area.innerHTML = pred_text.map(row => row.join(' ')).join('<br />');
+                input_area.value = input_area_rows.join('\n')
                 skip_up = true;
                 e.preventDefault();
             }
@@ -181,16 +212,29 @@ input_area.addEventListener("keydown", (e) => {
     } else if (e.key == "ArrowDown") {
         try {
             if (cursor_pos[1] < pred_text[cursor_pos[0]].join(' ').length && cursor_pos[1] == input_area.value.split('\n')[cursor_pos[0]].length) {
-                console.log(pred_text[cursor_pos[0]]);
                 const tmp = predictions[cursor_pos[0]].shift();
                 predictions[cursor_pos[0]].push(tmp);
 
                 pred_text[cursor_pos[0]] = pred_text[cursor_pos[0]].slice(0,2);
-                pred_text[cursor_pos[0]].push(...predictions[cursor_pos[0]][0].split(" "));
-                console.log(predictions[cursor_pos[0]][0]);
-                console.log(pred_text[cursor_pos[0]]);
+                pred_text[cursor_pos[0]].push(...predictions[cursor_pos[0]][0]["text"].split(" "));
+                
+                let input_area_rows = input_area.value.split('\n');
+                let edited_row = input_area_rows[cursor_pos[0]].split(/\s+/);
+                let last_text = '';
+                if (edited_row.length == 2) {
+                    last_text = edited_row.pop();
+                } else if (edited_row.length > 2) {
+                    last_text = edited_row.slice(2).join(' ');
+                    edited_row = edited_row.slice(0,2);
+                }
+                for (let i = 0; i < predictions[cursor_pos[0]][0]["ind"]; i++) {
+                    edited_row.push('');
+                }
+                edited_row.push(last_text);
+                input_area_rows[cursor_pos[0]] = edited_row.join(' ');
 
                 pred_area.innerHTML = pred_text.map(row => row.join(' ')).join('<br />');
+                input_area.value = input_area_rows.join('\n')
                 skip_up = true;
                 e.preventDefault();
             }
@@ -203,23 +247,52 @@ input_area.addEventListener("keydown", (e) => {
 });
 
 input_area.addEventListener("keyup", (e) => {
-    console.log("what", skip_up);
     if (skip_up) {
         skip_up = false;
-        console.log("what", skip_up);
         e.preventDefault();
         return
     }
     const input_area_rows = input_area.value.split('\n');
+    const input_area_rows_out = [];
     pred_text = [];
     valid_text = [];
     predictions = [];
     for (const row of input_area_rows) {
-        const [prediction_text, prediction_list] = generate_prediction(row, food_names);
+        // const [prediction_text, prediction_list, new_row] = generate_prediction(row, food_names);
+        // pred_text.push(prediction_text);
+        const prediction_list = generate_prediction(row, food_names);
         predictions.push(prediction_list);
-        pred_text.push(prediction_text);
-        if (row == prediction_text.join(' ') && row.split(' ').length > 2) {
-            valid_text.push(prediction_text);
+
+        let pred_row = row.split(/\s+/);
+        if (prediction_list.length) {
+            if (pred_row.length == 2) {
+                pred_row.pop();
+            } else if (pred_row.length > 2) {
+                pred_row = pred_row.slice(0,2);
+            }
+            pred_row.push(prediction_list[0]["text"]);
+
+            let edited_row = row.split(/\s+/);
+            let last_text = '';
+            if (edited_row.length == 2) {
+                last_text = edited_row.pop();
+            } else if (edited_row.length > 2) {
+                last_text = edited_row.slice(2).join(' ');
+                edited_row = edited_row.slice(0,2);
+            }
+            for (let i = 0; i < prediction_list[0]["ind"]; i++) {
+                edited_row.push('');
+            }
+            edited_row.push(last_text);
+            input_area_rows_out.push(edited_row.join(' '));
+        } else {
+            pred_row = [];
+            input_area_rows_out.push(row);
+        }
+        pred_text.push(pred_row);
+
+        if (row == pred_row.join(' ') && row.split(' ').length > 2) {
+            valid_text.push(pred_row);
         } else {
             valid_text.push([]);
         }
@@ -227,4 +300,5 @@ input_area.addEventListener("keyup", (e) => {
     pred_area.innerHTML = pred_text.map(row => row.join(' ')).join('<br />');
     valid_area.innerHTML = valid_text.map(row => row.join(' ')).join('<br />');
     out_area.innerHTML = generate_weight(valid_text).map(row => row.join(' ')).join('\n');
+    input_area.value = input_area_rows_out.join('\n')
 });
